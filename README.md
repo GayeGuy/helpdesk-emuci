@@ -1,5 +1,7 @@
 # HelpDesk EMUCI
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/GayeGuy/helpdesk-emuci)
+
 Application de **bureau à distance / support technique** — MVP web validant l'architecture
 d'assistance à distance décrite dans le cahier des charges : un **technicien** prend le
 contrôle visuel de l'écran d'un **agent** (poste assisté) après consentement explicite.
