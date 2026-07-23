@@ -79,9 +79,28 @@ app.get('/api/audit', requireAuth, requireRole('admin'), async (_req, res) =>
 // --- Frontend statique (production : servi par le backend, même origine) ---
 const distPath = path.join(__dirname, '..', 'frontend', 'dist');
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      index: false,
+      setHeaders(res, filePath) {
+        // Les assets Vite sont hashés → immuables. index.html ne doit jamais être
+        // mis en cache, sinon il continue de référencer les hashes d'un ancien build.
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    }),
+  );
+
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
+    // Ne JAMAIS renvoyer index.html pour un fichier manquant : le navigateur
+    // recevrait du HTML en 200 à la place d'un JS/CSS et le mettrait en cache,
+    // ce qui casse la page durablement (page blanche ou sans styles).
+    if (path.extname(req.path)) return res.status(404).type('text/plain').send('Not found');
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
