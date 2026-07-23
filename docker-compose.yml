@@ -1,0 +1,28 @@
+# Exécution locale complète (backend + frontend build) avec PostgreSQL.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: helpdesk
+      POSTGRES_PASSWORD: helpdesk
+      POSTGRES_DB: helpdesk
+    ports:
+      - "5432:5432"
+    volumes:
+      - helpdesk_pg:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      DATABASE_URL: postgresql://helpdesk:helpdesk@db:5432/helpdesk
+      CORS_ORIGIN: "*"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  helpdesk_pg:
