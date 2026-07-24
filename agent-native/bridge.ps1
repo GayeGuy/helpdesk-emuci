@@ -80,8 +80,11 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         [U32]::mouse_event($MOUSE["${arg}up"], 0, 0, 0, [IntPtr]::Zero)
       }
       'S'   {
-        $delta = if ([int]$arg -gt 0) { -120 } else { 120 }
-        [U32]::mouse_event($MOUSE.wheel, 0, 0, [uint32]([int64]$delta -band 0xFFFFFFFF), [IntPtr]::Zero)
+        # dy>0 (molette vers le bas) => WHEEL_DELTA négatif = -120, soit 4294967176
+        # en non signé. On code les deux valeurs en dur pour éviter le piège
+        # PowerShell 5.1 où 0xFFFFFFFF vaut -1 (et casse la conversion en UInt32).
+        $dw = if ([int]$arg -gt 0) { [uint32]4294967176 } else { [uint32]120 }
+        [U32]::mouse_event($MOUSE.wheel, 0, 0, $dw, [IntPtr]::Zero)
       }
       'K'   {
         if ($VK.ContainsKey($arg)) {
