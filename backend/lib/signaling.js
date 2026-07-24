@@ -93,6 +93,12 @@ export function attachSignaling(httpServer, store) {
           lastSeen: Date.now(),
           native: !!msg.native,
         });
+        // Fermer une éventuelle connexion précédente du même agent.
+        const prev = agentSockets.get(agentId);
+        if (prev && prev !== ws) {
+          prev.meta = { role: 'agent', agentId: null }; // sa fermeture ne touchera plus le statut
+          try { prev.close(); } catch {}
+        }
         ws.meta = { role: 'agent', agentId };
         agentSockets.set(agentId, ws);
         await store.audit({ type: 'agent-online', agentId, ip: ws.ip });
@@ -235,13 +241,18 @@ export function attachSignaling(httpServer, store) {
     }
     if (ws.meta?.role === 'agent') {
       const { agentId } = ws.meta;
-      agentSockets.delete(agentId);
-      await store.setAgentStatus(agentId, { status: 'offline', lastSeen: Date.now() });
-      await store.audit({ type: 'agent-offline', agentId });
-      for (const [sid, live] of liveSessions) {
-        if (live.agentWs === ws) await endSession(sid, 'agent-disconnect');
+      // Ne marquer hors ligne que si CETTE ws est toujours la connexion active.
+      // Sinon la fermeture (retardée) d'une ancienne connexion écraserait le
+      // statut « en ligne » d'une reconnexion récente du même agent.
+      if (agentSockets.get(agentId) === ws) {
+        agentSockets.delete(agentId);
+        await store.setAgentStatus(agentId, { status: 'offline', lastSeen: Date.now() });
+        await store.audit({ type: 'agent-offline', agentId });
+        for (const [sid, live] of liveSessions) {
+          if (live.agentWs === ws) await endSession(sid, 'agent-disconnect');
+        }
+        await broadcastAgents();
       }
-      await broadcastAgents();
     }
   }
 
