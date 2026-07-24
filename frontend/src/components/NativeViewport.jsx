@@ -9,12 +9,18 @@ const SPECIAL = {
   Home: 'HOME', End: 'END', PageUp: 'PGUP', PageDown: 'PGDN',
 };
 
-export default function NativeViewport({ bus, sessionId, send }) {
+export default function NativeViewport({ bus, sessionId, send, registerCapture }) {
   const canvasRef = useRef(null);
   const imgRef = useRef(new Image());
   const lastMove = useRef(0);
   const [fps, setFps] = useState(0);
   const frameCount = useRef(0);
+
+  // Expose au parent une fonction qui télécharge l'écran courant en PNG.
+  useEffect(() => {
+    registerCapture?.(() => canvasRef.current);
+    return () => registerCapture?.(null);
+  }, []);
 
   useEffect(() => {
     const img = imgRef.current;

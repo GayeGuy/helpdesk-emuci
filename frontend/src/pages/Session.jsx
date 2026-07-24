@@ -10,9 +10,27 @@ const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 export default function Session({ session, agent, user, send, bus, onClose }) {
   const videoRef = useRef(null);
   const pcRef = useRef(null);
+  const captureSource = useRef(null); // renvoie un canvas/vidéo à capturer
   const [elapsed, setElapsed] = useState(0);
   const [streaming, setStreaming] = useState(false);
   const isNative = !!agent.native;
+
+  // Télécharge une capture de l'écran affiché (canvas natif ou image vidéo WebRTC).
+  function capture() {
+    const src = captureSource.current?.();
+    if (!src) return;
+    const w = src.videoWidth || src.width;
+    const h = src.videoHeight || src.height;
+    if (!w || !h) return;
+    const cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    cv.getContext('2d').drawImage(src, 0, 0, w, h);
+    const a = document.createElement('a');
+    a.href = cv.toDataURL('image/png');
+    a.download = `capture-${agent.agentId || 'agent'}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
+    a.click();
+  }
 
   useEffect(() => {
     if (session.status !== 'active' || isNative) return undefined;
@@ -46,6 +64,15 @@ export default function Session({ session, agent, user, send, bus, onClose }) {
     };
   }, [session.status]);
 
+  // Mode WebRTC : la source de capture est l'élément vidéo.
+  useEffect(() => {
+    if (isNative) return undefined;
+    captureSource.current = () => videoRef.current;
+    return () => {
+      captureSource.current = null;
+    };
+  }, [isNative]);
+
   // Chronomètre (valable pour les deux modes).
   useEffect(() => {
     if (session.status !== 'active') return undefined;
@@ -69,6 +96,11 @@ export default function Session({ session, agent, user, send, bus, onClose }) {
         <div className="session-timer">
           {session.status === 'active' ? `⏱ ${mmss}` : 'En attente…'}
         </div>
+        {session.status === 'active' && (
+          <button className="btn ghost" onClick={capture} title="Enregistrer une capture PNG">
+            📷 Capture
+          </button>
+        )}
         <button className="btn danger" onClick={onClose}>
           ⏹ Terminer
         </button>
@@ -83,7 +115,14 @@ export default function Session({ session, agent, user, send, bus, onClose }) {
               <p className="muted">En attente de l'acceptation par l'utilisateur.</p>
             </div>
           ) : isNative ? (
-            <NativeViewport bus={bus} sessionId={session.id} send={send} />
+            <NativeViewport
+              bus={bus}
+              sessionId={session.id}
+              send={send}
+              registerCapture={(fn) => {
+                captureSource.current = fn;
+              }}
+            />
           ) : (
             <>
               {!streaming && (
