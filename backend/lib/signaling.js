@@ -11,6 +11,26 @@ const send = (ws, obj) => {
 export function attachSignaling(httpServer, store) {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
+  // Heartbeat : Render (et les proxys) coupent les WebSocket inactifs sans
+  // envoyer de trame « close ». Sans ping régulier, le serveur garde des
+  // sockets zombies « ouverts » et relaie dans le vide. On ping toutes les
+  // 25 s et on termine ceux qui ne répondent pas (déclenche le nettoyage).
+  const HEARTBEAT_MS = 25000;
+  const hb = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        continue;
+      }
+      ws.isAlive = false;
+      try {
+        ws.ping();
+      } catch {}
+    }
+  }, HEARTBEAT_MS);
+  hb.unref?.(); // ne pas empêcher l'arrêt du process (tests)
+  wss.on('close', () => clearInterval(hb));
+
   // État vivant (en mémoire), distinct de la persistance.
   const agentSockets = new Map(); // agentId -> ws
   const technicianSockets = new Set(); // ws de techniciens authentifiés
@@ -48,6 +68,10 @@ export function attachSignaling(httpServer, store) {
 
   wss.on('connection', (ws, req) => {
     ws.meta = { role: null };
+    ws.isAlive = true;
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
     ws.ip = (req.socket.remoteAddress || '').replace('::ffff:', '');
     ws.on('message', (data) => {
       let msg;

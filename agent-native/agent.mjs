@@ -114,6 +114,29 @@ function applyControl(ev) {
 // --- Connexion signalisation ---
 function connect() {
   ws = new WebSocket(SERVER);
+
+  // Chien de garde : si la connexion meurt silencieusement (proxy/Render),
+  // aucun événement 'close' n'arrive. On ping le serveur et on force une
+  // reconnexion si aucune activité (pong/message) depuis ~50 s.
+  let alive = true;
+  const bump = () => {
+    alive = true;
+  };
+  ws.on('pong', bump);
+  const watchdog = setInterval(() => {
+    if (!alive) {
+      console.log('Aucune réponse du serveur — reconnexion forcée.');
+      try {
+        ws.terminate();
+      } catch {}
+      return;
+    }
+    alive = false;
+    try {
+      ws.ping();
+    } catch {}
+  }, 25000);
+
   ws.on('open', () => {
     console.log(`Connecté à ${SERVER}`);
     ws.send(
@@ -128,6 +151,7 @@ function connect() {
     );
   });
   ws.on('message', (raw) => {
+    bump();
     const msg = JSON.parse(raw.toString());
     switch (msg.type) {
       case 'registered':
@@ -162,6 +186,7 @@ function connect() {
     }
   });
   ws.on('close', () => {
+    clearInterval(watchdog);
     console.log('Déconnecté. Reconnexion dans 3 s…');
     capturing = false;
     sessionId = null;
