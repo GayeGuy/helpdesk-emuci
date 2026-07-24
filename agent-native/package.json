@@ -1,0 +1,14 @@
+{
+  "name": "helpdesk-emuci-agent-native",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent natif Windows HelpDesk EMUCI (capture écran + contrôle souris/clavier)",
+  "bin": { "helpdesk-agent": "agent.mjs" },
+  "scripts": {
+    "start": "node agent.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

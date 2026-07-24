@@ -1,20 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import Chat from '../components/Chat.jsx';
+import NativeViewport from '../components/NativeViewport.jsx';
 
 const RTC_CONFIG = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-// Vue technicien : reçoit le flux d'écran de l'agent (répondeur WebRTC) + chat.
+// Vue technicien : reçoit le flux d'écran de l'agent + chat.
+// Agent natif → images JPEG sur canvas avec contrôle souris/clavier.
+// Agent navigateur → flux vidéo WebRTC (visualisation seule).
 export default function Session({ session, agent, user, send, bus, onClose }) {
   const videoRef = useRef(null);
   const pcRef = useRef(null);
   const [elapsed, setElapsed] = useState(0);
   const [streaming, setStreaming] = useState(false);
+  const isNative = !!agent.native;
 
   useEffect(() => {
-    if (session.status !== 'active') return undefined;
-    const startedAt = Date.now();
-    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
-
+    if (session.status !== 'active' || isNative) return undefined;
     const pc = new RTCPeerConnection(RTC_CONFIG);
     pcRef.current = pc;
     pc.ontrack = (e) => {
@@ -40,10 +41,17 @@ export default function Session({ session, agent, user, send, bus, onClose }) {
     });
 
     return () => {
-      clearInterval(timer);
       bus.off('signal');
       pc.close();
     };
+  }, [session.status]);
+
+  // Chronomètre (valable pour les deux modes).
+  useEffect(() => {
+    if (session.status !== 'active') return undefined;
+    const startedAt = Date.now();
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(timer);
   }, [session.status]);
 
   const mmss = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`;
@@ -74,6 +82,8 @@ export default function Session({ session, agent, user, send, bus, onClose }) {
               <p>Demande envoyée à {agent.name || agent.agentId}…</p>
               <p className="muted">En attente de l'acceptation par l'utilisateur.</p>
             </div>
+          ) : isNative ? (
+            <NativeViewport bus={bus} sessionId={session.id} send={send} />
           ) : (
             <>
               {!streaming && (

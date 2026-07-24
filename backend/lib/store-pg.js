@@ -20,8 +20,10 @@ CREATE TABLE IF NOT EXISTS agents (
   resolution TEXT,
   ip TEXT,
   status TEXT,
-  last_seen BIGINT
+  last_seen BIGINT,
+  native BOOLEAN DEFAULT false
 );
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS native BOOLEAN DEFAULT false;
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY,
   agent_id TEXT,
@@ -54,6 +56,7 @@ const agentRow = (r) =>
     ip: r.ip,
     status: r.status,
     lastSeen: r.last_seen != null ? Number(r.last_seen) : null,
+    native: !!r.native,
   };
 
 const sessionRow = (r) =>
@@ -120,12 +123,13 @@ export function createPgStore(connectionString) {
     },
     async upsertAgent(a) {
       await q(
-        `INSERT INTO agents (agent_id, name, os, resolution, ip, status, last_seen)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `INSERT INTO agents (agent_id, name, os, resolution, ip, status, last_seen, native)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
          ON CONFLICT (agent_id) DO UPDATE SET
            name=EXCLUDED.name, os=EXCLUDED.os, resolution=EXCLUDED.resolution,
-           ip=EXCLUDED.ip, status=EXCLUDED.status, last_seen=EXCLUDED.last_seen`,
-        [a.agentId, a.name, a.os, a.resolution, a.ip, a.status, a.lastSeen],
+           ip=EXCLUDED.ip, status=EXCLUDED.status, last_seen=EXCLUDED.last_seen,
+           native=EXCLUDED.native`,
+        [a.agentId, a.name, a.os, a.resolution, a.ip, a.status, a.lastSeen, !!a.native],
       );
       return this.findAgentById(a.agentId);
     },

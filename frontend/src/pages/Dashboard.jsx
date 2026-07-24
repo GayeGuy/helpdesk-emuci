@@ -45,6 +45,7 @@ export default function Dashboard({ user, onLogout }) {
           alert(msg.error);
           break;
         case 'signal':
+        case 'frame':
         case 'chat':
         case 'chat-ack':
         case 'session-end':
@@ -147,6 +148,9 @@ function AgentsGrid({ agents, onConnect, osIcon }) {
             <span>{a.os}</span>
             {a.resolution && <span>{a.resolution}</span>}
             {a.ip && <span>{a.ip}</span>}
+            <span className={a.native ? 'tag-native' : ''}>
+              {a.native ? '🖥️ natif · contrôle' : '🌐 navigateur · vue'}
+            </span>
           </div>
           <button
             className="btn primary"

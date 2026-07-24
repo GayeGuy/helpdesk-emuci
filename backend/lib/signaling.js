@@ -91,6 +91,7 @@ export function attachSignaling(httpServer, store) {
           ip: ws.ip,
           status: 'online',
           lastSeen: Date.now(),
+          native: !!msg.native,
         });
         ws.meta = { role: 'agent', agentId };
         agentSockets.set(agentId, ws);
@@ -171,6 +172,28 @@ export function attachSignaling(httpServer, store) {
         if (!live) return;
         const target = ws === live.agentWs ? live.technicianWs : live.agentWs;
         send(target, { type: 'signal', sessionId: msg.sessionId, payload: msg.payload });
+        break;
+      }
+
+      // --- Agent natif : image d'écran (agent → technicien) ---
+      case 'frame': {
+        const live = liveSessions.get(msg.sessionId);
+        if (!live || ws !== live.agentWs) return;
+        send(live.technicianWs, {
+          type: 'frame',
+          sessionId: msg.sessionId,
+          data: msg.data,
+          w: msg.w,
+          h: msg.h,
+        });
+        break;
+      }
+
+      // --- Agent natif : contrôle souris/clavier (technicien → agent) ---
+      case 'control': {
+        const live = liveSessions.get(msg.sessionId);
+        if (!live || ws !== live.technicianWs) return;
+        send(live.agentWs, { type: 'control', sessionId: msg.sessionId, event: msg.event });
         break;
       }
 
